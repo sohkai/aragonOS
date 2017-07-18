@@ -54,6 +54,10 @@ contract('OwnershipApp', accounts => {
       assert.equal(tokenAddress, token.address, 'token address should match in app')
       assert.equal(governanceRights, 1, 'gov rights should match in app')
       assert.equal(economicRights, 1, 'econ rights should match in app')
+
+      assert.equal(await token.controller(), dao.address, 'dao should be controller')
+      assert.equal(await Controller.at(dao.address).onTransfer('0x12', '0x23', 10), true, 'dao allow transfers')
+      assert.equal(await Controller.at(dao.address).onApprove('0x12', '0x23', 10), true, 'dao allow approves')
     })
 
     it('removes the token', async () => {

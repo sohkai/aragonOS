@@ -87,11 +87,11 @@ contract OwnershipApp is Application, Controller, Requestor {
     return false;
   }
 
-  function onTransfer(address _from, address _to, uint _amount) returns (bool) {
+  function onTransfer(address _from, address _to, uint _amount) constant returns (bool) {
     return true;
   }
 
-  function onApprove(address _owner, address _spender, uint _amount) returns (bool) {
+  function onApprove(address _owner, address _spender, uint _amount) constant returns (bool) {
     return true;
   }
 
