@@ -1,0 +1,29 @@
+INFO:root:contract /aragonOS/lib/minime/MiniMeToken.sol:Controlled:
+INFO:symExec:	============ Results ===========
+INFO:symExec:	  EVM Code Coverage: 			 99.4%
+INFO:symExec:	  Parity Multisig Bug 2: 		 False
+INFO:symExec:	  Callstack Depth Attack Vulnerability:  False
+INFO:symExec:	  Transaction-Ordering Dependence (TOD): False
+INFO:symExec:	  Timestamp Dependency: 		 False
+INFO:symExec:	  Re-Entrancy Vulnerability: 		 False
+INFO:root:contract /aragonOS/lib/minime/MiniMeToken.sol:MiniMeToken:
+INFO:symExec:	============ Results ===========
+INFO:symExec:	  EVM Code Coverage: 			 40.9%
+INFO:symExec:	  Parity Multisig Bug 2: 		 False
+INFO:symExec:	  Callstack Depth Attack Vulnerability:  False
+INFO:symExec:	  Transaction-Ordering Dependence (TOD): False
+INFO:symExec:	  Timestamp Dependency: 		 False
+INFO:symExec:	  Re-Entrancy Vulnerability: 		 True
+INFO:symExec:/aragonOS/lib/minime/MiniMeToken.sol:499:17: Warning: Re-Entrancy Vulnerability.
+        require(ITokenController(controller).proxyPayment.value(msg.value)(msg.sender)
+INFO:root:contract /aragonOS/lib/minime/MiniMeToken.sol:MiniMeTokenFactory:
+INFO:symExec:	============ Results ===========
+INFO:symExec:	  EVM Code Coverage: 			 8.8%
+INFO:symExec:	  Parity Multisig Bug 2: 		 False
+INFO:symExec:	  Callstack Depth Attack Vulnerability:  False
+INFO:symExec:	  Transaction-Ordering Dependence (TOD): False
+INFO:symExec:	  Timestamp Dependency: 		 False
+INFO:symExec:	  Re-Entrancy Vulnerability: 		 False
+INFO:symExec:	====== Analysis Completed ======
+INFO:symExec:	====== Analysis Completed ======
+INFO:symExec:	====== Analysis Completed ======
