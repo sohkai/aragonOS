@@ -15,6 +15,10 @@
 - No linting errors
 - All unit tests passing (`aragonOS` only; see note above)
 - Uses industry-standard library contracts for common operations, including OpenZeppelin and MiniMe
+- As a scale, I'm using:
+    - High-severity: anything that can result in loss of funds for users, or otherwise achieve highly damaging effects on user DAOs
+    - Mid-severity: exploitable issues, but either preventable in some way, technically difficult (or impossible) to solve for every one in the ecosytem, or very low probability of actually being exploited
+    - Low-severity: nice-to-haves, very low incentive attacks
 
 ### Out of scope
 
@@ -25,12 +29,7 @@ I have, for the most part, ignored:
 - An exhaustive look through the unit tests to see if they miss any obvious functionality (100% code and branch coverage is a good start but is usually not the whole story)
 
 
-## Issues
-
-- As a scale, I'm using:
-    - High-severity: anything that can result in loss of funds for users, or otherwise achieve highly damaging effects on user DAOs
-    - Mid-severity: exploitable issues, but either preventable in some way, technically difficult (or impossible) to solve for every one in the ecosytem, or very low probability of actually being exploited
-    - Low-severity: nice-to-haves, very low incentive attacks
+## aragonOS Issues
 
 ### Mid-severity
 
@@ -122,6 +121,60 @@ aragonOS/contracts/apm/Repo.sol:78:5: Warning: Function state mutability can be 
 - Check and update library contracts for latest versions (e.g. Zeppelin, MiniMe) if any bug fixes have been introduced
 - In general, it may be a good idea to introduce ETH / ERC20 escape hatches for non-Vault contracts (e.g. see [Escapable](https://github.com/Giveth/Donation-Doubler/blob/master/contracts/Escapable.sol), or an even simpler contract that just exposes a [function allowing `owner` to withdraw any ETH or ERC20 token owned by the contract](https://github.com/Giveth/minime/blob/master/contracts/MiniMeToken.sol#L497))
     - Alternatively, contracts could revert in the fallback function and ERC223/677 callbacks, but ERC20 tokens could still be locked up
+
+
+## aragon-apps Issues
+
+### Low-Severity
+
+- General
+    - Given that most storage arrays in the apps are never iterated, they could be implemented with `mapping (bytes32 => ...)`s instead, where the key is `keccak256('<type>', currentNumOfType)`. The main advantage of this is being able to avoid any index manipulation targeted for humans (i.e. forcing some arrays to start at `1` because `0` doesn't make intuitive sense). Also, a pseudorandom `bytes32` value arguably makes more sense as an identifier than an incrementing `uint`. Clients could listen to the logs (or rebuild the hashes, if `currentNumOfType` is known) to build their UIs.
+- Finance
+    - `aragon-apps/apps/finance/contracts/Finance.sol`:
+        - Should add clarifications as to whether a token must be added to the budget before being allowed to create payments
+            - l204 has a comment stating this to be the case, but the associated `require()` does not actually complete this check
+        - Comments may be beneficial for mappings (e.g. `token => budget` for `budgets`)
+        - `tokenStatement` should be renamed `tokenStatements`
+        - Consider increasing the minimum `periodDuration` to be greater than one second
+            - Extremely small `periodDurations` can cause the app to be onerous to maintain
+        - Deposit logic may benefit from being abstracted into internal `_deposit()` and `_depositFrom()` methods
+            - Improve DRYness when the combo of `_recordIncomingTransaction()` and `token.transfer()` or `token.transferFrom()` are used
+        - `newPayment()` acts differently for one-time, immediate payments than repeating payments when the payment fails
+            - One time payments cause a revert if they cannot be immediately executed while repeating payments will log a `PaymentFailure` event. It may be beneficial for both cases to match so as to avoid unexpected behaviour for users. One way of accomplishing this would be to cache a one-time payment if it cannot be immediately executed.
+        - `setBudget()` should check that `_amount` is greater than or equal to the current period's expenses
+            - Changing a budget to be smaller than the current period's expenses will likely be confusing for clients and should be avoided
+        - Remove payment date check from `executePayment()` and `receiverExecutePayment()`
+            - `require(nextPaymentTime(_paymentId) <= getTimestamp())` is already checked in `_executePayment()`
+        - `view` getters can be made `external`
+        - `nextPaymentTime()` (l402): `payment` should be a `storage` variable
+        - `nextPaymentTime()`'s casting from uint256 to uint64 (l410) should have an associated `require(nextPayment <= MAX_UINT64)`
+        - `getTimestamp()` should return `uint64` to conform with other dates
+        - `_canMakePayment()` should be `view`
+- TokenManager
+    - `aragon-apps/apps/token-manager/contracts/TokenManager.sol`:
+        - `transferable` and `logHolders` could be grouped together to save some storage
+        - `assignVested()` could be renamed to `assignVesting()` to clarify that it creates a vesting for an entity rather than assigning already vested tokens to an entity
+        - `allHolders()` and `spendableBalanceOf()` could be made external
+        - `isBalanceIncreaseAllowed()` should use `.add()`: `return token.balanceOf(_receiver).add(_inc) <= maxAccountTokens`
+        - `transferableBalance()`'s `_time` parameter should be of `uint64` for consistency with other dates
+        - `calculateNonVestedTokens()` should sanitize its time inputs: `require(start <= cliff && cliff <= vesting)`
+        - `calculateNonVestedTokens()`'s `vestedTokens` calculation could be simplified to `uint256 vestedToken = tokens.mul((time - start) / (vesting - start))` (assuming sanity checks above were performed)
+        - `_assign()` should also call `_logHolderIfNeeded(_receiver)`
+- Voting
+    - `aragon-apps/apps/voting/contracts/Voting.sol`:
+        - Add veto role: give an entity the ability to decide a vote unianimously
+            - Example use case: give certain entities (e.g. President) extra power to decide votes more quickly (allows them to have more power without being assigned other permissions).
+            - Example use case: in a stalemate due to not reaching `minAcceptQuorumPct`, a DAO may want to restart a vote with a lower `minAcceptQuorumPct`. At that point, the previous vote could be vetoed to be unsuccessful to allow a new vote to start right away, rather than having to wait for it to expire.
+        - Allow `minAcceptQuorumPct` to be provided when creating a new vote
+            - The main utility I could gather from allowing this parameter to be modified was that a DAO may choose different levels of importance for different votes (of the same type, i.e. time and required support), where size of quorum is a proxy for importance. However, given the current implementation, it would require multiple steps to change the `minAcceptQuorumPct` for a single vote (you'd have to change it, create a vote, and then change it back).
+            - Implementing this could be done via an overload, storing the quorum percentage given on initialization as the default percentage. `forward()` should always use the default percentage.
+        - In `struct Vote`, `startDate` and `executed` could be grouped together to save some storage
+        - `struct Vote`'s `totalVoters` could be renamed to `totalPossible` to avoid confusion over whether it holds the total number of individual voters or total possible votes
+        - `canExecute()` should use `.add()` (l153): `uint256 totalVotes = vote.yea.add(vote.nay)`
+        - `view` getters can be made `external`
+        - `_isVoteOpen()` should cast up rather than down: `return now < uint256(vote.startDate).add(uint256(voteTime)) && !vote.executed;`
+        - `_isValuePct()` could be renamed to `_isAtLeastPct()` for clarity
+        - `_isValuePct()` should use `.mul()` (l268): `uint256 m = _total.mul(_pct)`
 
 
 ## Tools
