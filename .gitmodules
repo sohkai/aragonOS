@@ -1,0 +1,3 @@
+[submodule "aragon-apps"]
+	path = aragon-apps
+	url = git@github.com:sohkai/aragon-apps.git
